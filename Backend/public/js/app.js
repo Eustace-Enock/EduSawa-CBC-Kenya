@@ -70,7 +70,7 @@ function render(view) {
             </select>
             <button onclick="handleRegister()" class="w-full py-4 bg-white text-navy font-bold text-xl rounded-2xl">Create Account</button>
           </div>
-          <p class="text-center text-xs mt-6 text-gray-400">Demo password: 123456</p>
+          <p class="text-center text-xs mt-6 text-gray-400">Demo password:</p>
         </div>
       </div>`;
   } 
