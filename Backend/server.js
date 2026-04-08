@@ -104,10 +104,9 @@ app.post('/api/ai', async (req, res) => {
 // Materials Routes 
 app.get('/api/materials', async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, title, subject, content, created_at FROM materials ORDER BY created_at DESC');
+    const result = await pool.query('SELECT * FROM materials ORDER BY created_at DESC');
     res.json(result.rows);
   } catch (err) {
-    console.error("Materials GET Error:", err.message);
     res.status(500).json({ error: "Failed to load materials" });
   }
 });
@@ -140,17 +139,17 @@ app.get('/api/quizzes', async (req, res) => {
 });
 
 // Submit quiz score
-app.post('/api/quizzes/submit', async (req, res) => {
-  const { quiz_id, score } = req.body;
+app.post('/api/quizzes', async (req, res) => {
+  const { title, subject, questions } = req.body;
   try {
-    await pool.query(
-      'INSERT INTO progress (user_id, quiz_id, score) VALUES ($1, $2, $3)', 
-      [1, quiz_id, score]   // Demo user_id = 1
+    const result = await pool.query(
+      'INSERT INTO quizzes (title, subject, questions) VALUES ($1, $2, $3) RETURNING *',
+      [title, subject, questions]
     );
-    res.json({ success: true });
+    res.json({ success: true, quiz: result.rows[0] });
   } catch (err) {
-    console.error("Submit Quiz Error:", err.message);
-    res.status(500).json({ error: "Failed to save score" });
+    console.error(err);
+    res.status(500).json({ error: "Failed to upload quiz" });
   }
 });
 

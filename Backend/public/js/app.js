@@ -272,6 +272,9 @@ function studentDashboard() {
         <select id="labSelect" onchange="loadLab()" class="w-full p-4 bg-gray-900 rounded-2xl mb-6">
           <option value="pendulum">Physics - Pendulum</option>
           <option value="molecule">Chemistry - Water Molecule</option>
+          <option value="solar">Physics - Solar System</option>
+          <option value="cell">Biology - Plant Cell</option>
+          <option value="dna">Biology - DNA Helix</option>
         </select>
         <canvas id="threeCanvas" class="w-full h-80 bg-black rounded-2xl"></canvas>
       </div>
@@ -282,6 +285,10 @@ function studentDashboard() {
       <div class="lg:col-span-12 bg-black rounded-3xl p-8">
         <h3 class="text-3xl font-bold mb-6">📝 CBC Quizzes</h3>
         <div id="quizzes-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+      </div>
+      <div class="lg:col-span-12 bg-black rounded-3xl p-8">
+        <h3 class="text-3xl font-bold mb-6">📊 My Progress</h3>
+        <div id="progress-list" class="space-y-3"></div>
       </div>
     </div>`;
 }
@@ -423,28 +430,68 @@ async function loadMaterials() {
   renderMaterials(offlineMaterials);
 }
 
-function renderMaterials(materials) {
+// Real Material View
+async function loadMaterials() {
   const container = document.getElementById('materials-list');
-  if (materials.length === 0) {
-    container.innerHTML = `<p class="text-gray-400">No materials available yet.</p>`;
-    return;
-  }
+  try {
+    const res = await fetch('/api/materials');
+    const materials = await res.json();
 
-  let html = '';
-  materials.forEach(m => {
-    html += `
-      <div class="bg-gray-900 p-6 rounded-2xl">
-        <h4 class="font-bold">${m.title}</h4>
-        <p class="text-sm text-gray-400">${m.subject || 'General'}</p>
-        <button onclick="viewMaterial('${m.title}')" 
-                class="mt-4 px-6 py-2 bg-navy text-white text-sm rounded-xl">View Content</button>
-      </div>`;
-  });
-  container.innerHTML = html;
+    let html = '';
+    materials.forEach(m => {
+      html += `
+        <div class="bg-gray-900 p-6 rounded-2xl cursor-pointer" onclick="viewFullMaterial('${m.title}', \`${m.content ? m.content.replace(/`/g, '\\`') : ''}\`)">
+          <h4 class="font-bold">${m.title}</h4>
+          <p class="text-sm text-gray-400">${m.subject || 'General'}</p>
+        </div>`;
+    });
+    container.innerHTML = html || '<p class="text-gray-400">No materials yet.</p>';
+  } catch (e) {
+    container.innerHTML = '<p class="text-red-400">Failed to load materials.</p>';
+  }
 }
 
-function viewMaterial(title) {
-  alert(`📘 Material: ${title}\n\nContent loaded from cache (offline ready).`);
+function viewFullMaterial(title, content) {
+  const html = `
+    <div class="min-h-screen bg-navy flex items-center justify-center p-6">
+      <div class="bg-black p-10 rounded-3xl max-w-3xl w-full">
+        <h2 class="text-3xl font-bold mb-6">${title}</h2>
+        <div class="prose text-gray-200 text-lg leading-relaxed whitespace-pre-wrap">${content || 'No content available'}</div>
+        <button onclick="render('dashboard')" class="mt-10 px-8 py-4 bg-white text-navy font-bold rounded-2xl">Back to Dashboard</button>
+      </div>
+    </div>`;
+  document.getElementById('root').innerHTML = html;
+}
+
+// Progress Tracking
+async function loadProgress() {
+  const container = document.getElementById('progress-list');
+  try {
+    const res = await fetch('/api/progress');
+    const progress = await res.json();
+
+    if (progress.length === 0) {
+      container.innerHTML = `<p class="text-gray-400">No quiz attempts yet. Take your first quiz!</p>`;
+      return;
+    }
+
+    let html = '';
+    progress.forEach(p => {
+      html += `
+        <div class="bg-gray-900 p-5 rounded-2xl flex justify-between items-center">
+          <div>
+            <p class="font-medium">${p.title}</p>
+            <p class="text-sm text-gray-400">${new Date(p.completed_at).toLocaleDateString()}</p>
+          </div>
+          <div class="text-right">
+            <span class="text-2xl font-bold ${p.score >= 70 ? 'text-emerald-400' : 'text-amber-400'}">${p.score}%</span>
+          </div>
+        </div>`;
+    });
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = `<p class="text-gray-400">Progress tracking coming soon.</p>`;
+  }
 }
 
 // Start the app
