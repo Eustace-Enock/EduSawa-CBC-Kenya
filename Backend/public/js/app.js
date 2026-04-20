@@ -1,5 +1,5 @@
 //  EDUSAWA FINAL  VERSION -TAYARI KUDEPLOY.
-console.log(" Edusawa - Fixed Login & Role Display");
+console.log(" Edusawa - Login & Role Display");
 
 let currentUser = null;
 let currentRole = null;
@@ -124,7 +124,7 @@ function handleRegister() {
 
   users.push({ username, password, role });
   saveUsers();
-  alert("✅ Account created! You can now login.");
+  alert(" Account created! You can now login.");
   showLoginTab();
 }
 
@@ -204,11 +204,11 @@ function showUploadForm() {
                class="w-full p-4 bg-gray-900 rounded-2xl mb-4 text-white">
         
         <select id="mat-subject" class="w-full p-4 bg-gray-900 rounded-2xl mb-4 text-white">
-          <option value="Mathematics">Mathematics</option>
           <option value="Science">Science</option>
-          <option value="Social Studies">Social Studies</option>
-          <option value="English">English</option>
-          <option value="Kiswahili">Kiswahili</option>
+          <option value="Technology">Technology</option>
+          <option value="Engineering">Engineering</option>
+          <option value="Mathematics">Mathematics</option>
+          <option value="Social Skills">Social Skills</option>
         </select>
         
         <textarea id="mat-content" rows="10" placeholder="Paste notes, questions or content here..." 
@@ -226,7 +226,7 @@ function showUploadForm() {
   document.getElementById('root').innerHTML = html;
 }
 
-// Real Upload Function (already existed, now properly connected)
+// Real Upload Function.
 async function uploadMaterial() {
   const title = document.getElementById('mat-title').value.trim();
   const subject = document.getElementById('mat-subject').value;
@@ -245,7 +245,7 @@ async function uploadMaterial() {
     });
 
     if (res.ok) {
-      alert("✅ Material uploaded successfully!");
+      alert(" Material uploaded successfully!");
       render('dashboard');   // Return to dashboard after upload
     } else {
       alert("Upload failed. Please try again.");
@@ -363,7 +363,6 @@ function showInstallButton() {
   document.body.appendChild(installBtn);
 }
 
-// OFFLINE MATERIAL CACHING 
 async function uploadMaterial() {
   const title = document.getElementById('mat-title').value.trim();
   const subject = document.getElementById('mat-subject').value;
@@ -371,16 +370,16 @@ async function uploadMaterial() {
 
   if (!title || !content) return alert("Title and content are required");
 
-  const materialData = {
+  const newMaterial = {
     id: Date.now(),
     title,
     subject,
     content,
-    uploadedAt: new Date().toISOString()
+    created_at: new Date().toISOString()
   };
 
   try {
-    // Save to server
+    // Try to save to server
     const res = await fetch('/api/materials', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -388,37 +387,36 @@ async function uploadMaterial() {
     });
 
     if (res.ok) {
-      // Also save locally for offline use
-      let offlineMaterials = JSON.parse(localStorage.getItem('offline_materials')) || [];
-      offlineMaterials.unshift(materialData);
-      localStorage.setItem('offline_materials', JSON.stringify(offlineMaterials));
-
-      alert("Material uploaded successfully!\nIt is also saved for offline viewing.");
-      document.getElementById('mat-title').value = '';
-      document.getElementById('mat-content').value = '';
-      
-      if (currentRole === 'student') loadMaterials();
+      alert("Material uploaded successfully!");
     }
   } catch (e) {
-    // Save locally even if server fails (offline first)
-    let offlineMaterials = JSON.parse(localStorage.getItem('offline_materials')) || [];
-    offlineMaterials.unshift(materialData);
-    localStorage.setItem('offline_materials', JSON.stringify(offlineMaterials));
-    
-    alert("⚠️ Saved locally for offline use. Will sync when online.");
+    console.log("Server offline, saving locally only");
   }
+
+  // Always save locally for offline access
+  let offlineMaterials = JSON.parse(localStorage.getItem('offline_materials')) || [];
+  offlineMaterials.unshift(newMaterial);
+  localStorage.setItem('offline_materials', JSON.stringify(offlineMaterials));
+
+  alert("Material saved! Available offline.");
+  render('dashboard');
 }
 
-// Enhanced loadMaterials with offline fallback
+
+// loadMaterials with  offline support
 async function loadMaterials() {
   const container = document.getElementById('materials-list');
   container.innerHTML = `<p class="text-gray-400">Loading materials...</p>`;
 
+  //online test first
   try {
     const res = await fetch('/api/materials');
     if (res.ok) {
       const materials = await res.json();
       renderMaterials(materials);
+      
+      // Save to local cache for offline use
+      localStorage.setItem('offline_materials', JSON.stringify(materials));
       return;
     }
   } catch (e) {
@@ -426,29 +424,31 @@ async function loadMaterials() {
   }
 
   // Offline fallback
-  const offlineMaterials = JSON.parse(localStorage.getItem('offline_materials')) || [];
-  renderMaterials(offlineMaterials);
+  const offlineData = localStorage.getItem('offline_materials');
+  if (offlineData) {
+    const materials = JSON.parse(offlineData);
+    renderMaterials(materials);
+  } else {
+    container.innerHTML = `<p class="text-gray-400">No materials available offline yet.<br>Connect to internet to load materials.</p>`;
+  }
 }
 
-// Real Material View
-async function loadMaterials() {
+function renderMaterials(materials) {
   const container = document.getElementById('materials-list');
-  try {
-    const res = await fetch('/api/materials');
-    const materials = await res.json();
-
-    let html = '';
-    materials.forEach(m => {
-      html += `
-        <div class="bg-gray-900 p-6 rounded-2xl cursor-pointer" onclick="viewFullMaterial('${m.title}', \`${m.content ? m.content.replace(/`/g, '\\`') : ''}\`)">
-          <h4 class="font-bold">${m.title}</h4>
-          <p class="text-sm text-gray-400">${m.subject || 'General'}</p>
-        </div>`;
-    });
-    container.innerHTML = html || '<p class="text-gray-400">No materials yet.</p>';
-  } catch (e) {
-    container.innerHTML = '<p class="text-red-400">Failed to load materials.</p>';
+  if (materials.length === 0) {
+    container.innerHTML = `<p class="text-gray-400">No materials available yet.</p>`;
+    return;
   }
+
+  let html = '';
+  materials.forEach(m => {
+    html += `
+      <div class="bg-gray-900 p-6 rounded-2xl cursor-pointer" onclick="viewFullMaterial('${m.title}', \`${(m.content || '').replace(/`/g, '\\`')}\`)">
+        <h4 class="font-bold">${m.title}</h4>
+        <p class="text-sm text-gray-400">${m.subject || 'General'}</p>
+      </div>`;
+  });
+  container.innerHTML = html;
 }
 
 function viewFullMaterial(title, content) {

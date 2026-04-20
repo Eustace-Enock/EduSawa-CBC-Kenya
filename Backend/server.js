@@ -67,7 +67,7 @@ app.get('/api/setup', async (req, res) => {
       `);
     }
 
-    res.json({ message: "✅ All tables created successfully! Sample quizzes added." });
+    res.json({ message: " All tables created successfully! Sample quizzes added." });
   } catch (err) {
     console.error("Setup Error:", err.message);
     res.status(500).json({ error: err.message });
@@ -168,7 +168,7 @@ app.get('/api/progress', async (req, res) => {
   }
 });
 
-// CATCH-ALL (MUST BE LAST)
+// CATCH-ALL.
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
