@@ -69,7 +69,7 @@ const pool = new Pool({
   password: process.env.DB_PASS,
 });
 
-// ========== API ROUTES ==========
+// API ROUTES
 
 // Database Setup
 app.get('/api/setup', async (req, res) => {
