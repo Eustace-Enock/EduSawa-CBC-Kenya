@@ -3,17 +3,63 @@ const { Pool } = require('pg');
 const path = require('path');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const multer = require('multer');
+const fs = require('fs');
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    cb(null, uniqueSuffix + ext);
+  }
+});
+
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = [
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+    'video/mp4', 'video/webm', 'video/ogg',
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+  ];
+  
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Invalid file type. Only images, videos, PDFs, and documents are allowed.'), false);
+  }
+};
+
+const upload = multer({ 
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: { fileSize: 100 * 1024 * 1024 } // 100MB limit
+});
+
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/uploads', express.static(uploadsDir));
 
 const pool = new Pool({
   host: process.env.DB_HOST || 'localhost',
@@ -23,17 +69,20 @@ const pool = new Pool({
   password: process.env.DB_PASS,
 });
 
-//  API ROUTES 
+// ========== API ROUTES ==========
 
-// Database Setup - Creates both materials and quizzes tables
+// Database Setup
 app.get('/api/setup', async (req, res) => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS materials (
         id SERIAL PRIMARY KEY,
         title TEXT NOT NULL,
-        content TEXT NOT NULL,
+        content TEXT,
         subject VARCHAR(50),
+        file_path VARCHAR(500),
+        file_mime VARCHAR(100),
+        original_name VARCHAR(255),
         created_at TIMESTAMP DEFAULT NOW()
       );
 
@@ -41,7 +90,8 @@ app.get('/api/setup', async (req, res) => {
         id SERIAL PRIMARY KEY,
         title TEXT NOT NULL,
         subject VARCHAR(50),
-        questions JSONB NOT NULL
+        questions JSONB NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
       );
 
       CREATE TABLE IF NOT EXISTS progress (
@@ -53,42 +103,49 @@ app.get('/api/setup', async (req, res) => {
       );
     `);
 
-    // Adding sample quizzes
+    // Add file columns if not exist (for existing DB)
+    await pool.query(`
+      ALTER TABLE materials 
+      ADD COLUMN IF NOT EXISTS file_path VARCHAR(500),
+      ADD COLUMN IF NOT EXISTS file_mime VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS original_name VARCHAR(255);
+    `).catch(() => {});
+
+    // Sample quizzes
     const quizCount = await pool.query("SELECT COUNT(*) FROM quizzes");
     if (parseInt(quizCount.rows[0].count) === 0) {
       await pool.query(`
         INSERT INTO quizzes (title, subject, questions) VALUES 
         ('Grade 7 Mathematics - Numbers', 'Mathematics', 
          '[{"q":"What is 12 × 8?", "o":["86","96","106"], "a":1}, 
-           {"q":"Solve 3x + 5 = 20", "o":["x=4","x=5","x=6"], "a":1}]'),
+           {"q":"Solve 3x + 5 = 20", "o":["x=4","x=5","x=6"], "a":1}]'::jsonb),
         ('Grade 7 Science - Photosynthesis', 'Science', 
-         '[{"q":"What do plants need for photosynthesis?", "o":["Sunlight, water and carbon dioxide","Only water","Only sunlight"], "a":0}]')
-        ON CONFLICT DO NOTHING;
+         '[{"q":"What do plants need for photosynthesis?", "o":["Sunlight, water and carbon dioxide","Only water","Only sunlight"], "a":0}]'::jsonb)
       `);
     }
 
-    res.json({ message: " All tables created successfully! Sample quizzes added." });
+    res.json({ message: " Database ready with file support and sample quizzes." });
   } catch (err) {
     console.error("Setup Error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
-// Real AI
+// AI endpoint
 app.post('/api/ai', async (req, res) => {
   const { prompt } = req.body;
   const GEMINI_KEY = process.env.GEMINI_API_KEY;
 
   if (!GEMINI_KEY) {
-    return res.json({ reply: "GEMINI_API_KEY is missing in .env" });
+    return res.json({ reply: "GEMINI_API_KEY is missing in .env file" });
   }
 
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: `You are Edusawa AI, a helpful Kenyan CBC teacher. Answer simply. Question: ${prompt}` }] }]
+        contents: [{ parts: [{ text: `You are Edusawa AI, a helpful Kenyan CBC teacher. Answer simply and educationally. Question: ${prompt}` }] }]
       })
     });
 
@@ -97,20 +154,26 @@ app.post('/api/ai', async (req, res) => {
     res.json({ reply });
   } catch (e) {
     console.error("AI Error:", e.message);
-    res.json({ reply: "AI temporarily unavailable." });
+    res.json({ reply: "AI temporarily unavailable. Please try again later." });
   }
 });
 
-// Materials Routes 
+// Get all materials (with file_url)
 app.get('/api/materials', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM materials ORDER BY created_at DESC');
-    res.json(result.rows);
+    const materials = result.rows.map(m => ({
+      ...m,
+      file_url: m.file_path ? `/uploads/${path.basename(m.file_path)}` : null
+    }));
+    res.json(materials);
   } catch (err) {
+    console.error("Materials GET Error:", err.message);
     res.status(500).json({ error: "Failed to load materials" });
   }
 });
 
+// Text-only upload (legacy)
 app.post('/api/materials', async (req, res) => {
   const { title, content, subject } = req.body;
   try {
@@ -125,12 +188,100 @@ app.post('/api/materials', async (req, res) => {
   }
 });
 
-// QUIZ ROUTES 
+// File upload endpoint
+app.post('/api/materials/upload-file', upload.single('file'), async (req, res) => {
+  try {
+    const { title, subject, description } = req.body;
+    const file = req.file;
+    
+    if (!file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+    
+    if (!title || title.trim() === '') {
+      fs.unlinkSync(file.path);
+      return res.status(400).json({ error: "Title is required" });
+    }
+    
+    const result = await pool.query(
+      `INSERT INTO materials (title, content, subject, file_path, file_mime, original_name) 
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [title, description || '', subject || 'General', file.path, file.mimetype, file.originalname]
+    );
+    
+    res.json({ 
+      success: true, 
+      message: "File uploaded successfully!",
+      material: result.rows[0]
+    });
+  } catch (err) {
+    console.error("File Upload Error:", err.message);
+    if (req.file && req.file.path) {
+      fs.unlinkSync(req.file.path);
+    }
+    res.status(500).json({ error: "Failed to upload file: " + err.message });
+  }
+});
 
-// Get all quizzes
+// Serve individual file for viewing
+app.get('/api/materials/file/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query('SELECT file_path, file_mime, original_name FROM materials WHERE id = $1', [id]);
+    
+    if (result.rows.length === 0 || !result.rows[0].file_path) {
+      return res.status(404).json({ error: "File not found" });
+    }
+    
+    const { file_path, file_mime, original_name } = result.rows[0];
+    
+    if (!fs.existsSync(file_path)) {
+      return res.status(404).json({ error: "File not found on server" });
+    }
+    
+    res.setHeader('Content-Type', file_mime);
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(original_name)}"`);
+    fs.createReadStream(file_path).pipe(res);
+  } catch (err) {
+    console.error("File Serve Error:", err.message);
+    res.status(500).json({ error: "Failed to retrieve file" });
+  }
+});
+
+// DELETE material (with file deletion)
+app.delete('/api/materials/:id', async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    const material = await pool.query('SELECT file_path FROM materials WHERE id = $1', [id]);
+    
+    if (material.rows.length === 0) {
+      return res.status(404).json({ error: "Material not found" });
+    }
+    
+    const filePath = material.rows[0].file_path;
+    
+    if (filePath && fs.existsSync(filePath)) {
+      try {
+        fs.unlinkSync(filePath);
+      } catch (err) {
+        console.error(`Failed to delete file: ${filePath}`, err.message);
+      }
+    }
+    
+    await pool.query('DELETE FROM materials WHERE id = $1', [id]);
+    
+    res.json({ success: true, message: "Material deleted successfully" });
+  } catch (err) {
+    console.error("Delete Error:", err.message);
+    res.status(500).json({ error: "Failed to delete material" });
+  }
+});
+
+// Quiz routes
 app.get('/api/quizzes', async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, title, subject, questions FROM quizzes');
+    const result = await pool.query('SELECT id, title, subject, questions FROM quizzes ORDER BY created_at DESC');
     res.json(result.rows);
   } catch (err) {
     console.error("Quizzes GET Error:", err.message);
@@ -138,7 +289,6 @@ app.get('/api/quizzes', async (req, res) => {
   }
 });
 
-// Submit quiz score
 app.post('/api/quizzes', async (req, res) => {
   const { title, subject, questions } = req.body;
   try {
@@ -153,7 +303,7 @@ app.post('/api/quizzes', async (req, res) => {
   }
 });
 
-// Get user progress (demo)
+// Progress routes
 app.get('/api/progress', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -161,18 +311,47 @@ app.get('/api/progress', async (req, res) => {
       FROM progress p 
       JOIN quizzes q ON p.quiz_id = q.id 
       ORDER BY p.completed_at DESC
+      LIMIT 20
     `);
     res.json(result.rows);
   } catch (err) {
+    console.error("Progress GET Error:", err.message);
     res.status(500).json({ error: "Failed to load progress" });
   }
 });
 
-// CATCH-ALL.
+app.post('/api/progress', async (req, res) => {
+  const { quiz_id, score } = req.body;
+  try {
+    await pool.query(
+      'INSERT INTO progress (quiz_id, score, user_id) VALUES ($1, $2, $3)',
+      [quiz_id, score, 1]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Progress POST Error:", err.message);
+    res.status(500).json({ error: "Failed to save progress" });
+  }
+});
+
+// Catch-all for SPA
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Error handling
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'FILE_TOO_LARGE') {
+      return res.status(400).json({ error: "File too large. Maximum size is 100MB." });
+    }
+    return res.status(400).json({ error: err.message });
+  }
+  console.error("Server Error:", err);
+  res.status(500).json({ error: "Internal server error" });
+});
+
 app.listen(PORT, () => {
   console.log(` Edusawa running on http://localhost:${PORT}`);
+  console.log(` Uploads directory: ${uploadsDir}`);
 });
