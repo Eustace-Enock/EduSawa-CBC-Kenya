@@ -31,7 +31,7 @@ function render(view) {
         </nav>
         <div class="flex-1 max-w-5xl mx-auto px-6 py-24 text-center">
           <h2 class="text-6xl font-bold mb-6">Learn STEMS the <span class="accent">smart</span> way - <br/>anytime, anywhere.</h2>
-          <p class="text-2xl text-gray-300 mb-12">AI • 3D Labs • Materials • Quizzes • Progressive Web APP</p>
+          <p class="text-2xl text-gray-300 mb-12">AI • 3D Labs • Materials • Quizzes • Progressive Web APP •Built for CBE Learners</p>
           <button onclick="navigate('login')" class="px-12 py-5 bg-white text-navy text-2xl font-bold rounded-3xl">Start Learning</button>
         </div>
         <div class="max-w-4xl mx-auto px-6 py-16 bg-black rounded-3xl mx-6">
