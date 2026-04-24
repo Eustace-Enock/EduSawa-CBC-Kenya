@@ -1,5 +1,5 @@
-// EDUSAWA 
-console.log("Edusawa - Full Version with Material Management");
+// EDUSAWA.
+console.log("Edusawa - Full Version");
 
 let currentUser = null;
 let currentRole = null;
@@ -31,12 +31,12 @@ function render(view) {
         </nav>
         <div class="flex-1 max-w-5xl mx-auto px-6 py-24 text-center">
           <h2 class="text-6xl font-bold mb-6">Learn STEMS the <span class="accent">smart</span> way - <br/>anytime, anywhere.</h2>
-          <p class="text-2xl text-gray-300 mb-12">AI • 3D Labs • Materials • Quizzes • Progress Web APP</p>
+          <p class="text-2xl text-gray-300 mb-12">AI • 3D Labs • Materials • Quizzes • Progressive Web APP</p>
           <button onclick="navigate('login')" class="px-12 py-5 bg-white text-navy text-2xl font-bold rounded-3xl">Start Learning</button>
         </div>
         <div class="max-w-4xl mx-auto px-6 py-16 bg-black rounded-3xl mx-6">
           <h3 class="text-4xl font-bold mb-8 text-center">About Us</h3>
-          <p class="text-lg text-gray-200">EduSawa,derived from the word Education and Usawa, means equitable education.EduSawa helps CBE learners access curated STEMS notes,quizzes, 3D videos and practice labs not forgetting offline-friendly design and AI/teacher-supported pathways.</p>
+          <p class="text-lg text-gray-200">EduSawa,derived from the words Education and Usawa, means equitable education.EduSawa helps CBE learners access curated STEMS notes,quizzes, 3D videos and practice labs not forgetting offline-friendly design and AI/teacher-supported pathways.</p>
         </div>
         <footer class="bg-black py-8 text-center text-sm text-gray-400 mt-auto">
           Edusawa was developed in 2026 • All Rights Reserved • Designed for Kenyan CBC Education
@@ -56,6 +56,9 @@ function render(view) {
             <input id="username" placeholder="Username" class="w-full p-4 bg-gray-900 rounded-2xl mb-4 text-white">
             <input id="password" type="password" placeholder="Password" class="w-full p-4 bg-gray-900 rounded-2xl mb-8 text-white">
             <button onclick="handleLogin()" class="w-full py-4 bg-white text-navy font-bold text-xl rounded-2xl">Login</button>
+            <div class="text-center mt-4">
+              <button onclick="showForgotPassword()" class="text-sm text-emerald-400 hover:text-emerald-300 underline">Forgot Password?</button>
+            </div>
           </div>
           <div id="register-form" class="hidden">
             <input id="reg-username" placeholder="New Username" class="w-full p-4 bg-gray-900 rounded-2xl mb-4 text-white">
@@ -74,7 +77,7 @@ function render(view) {
     html = `
       <nav class="bg-black p-5 flex justify-between sticky top-0 z-50">
         <div class="flex items-center gap-3">
-          <span class="text-3xl">📘</span>
+          <span class="text-3xl">📚</span>
           <h1 class="text-3xl font-bold">Edusawa</h1>
         </div>
         <div class="flex items-center gap-6">
@@ -105,15 +108,79 @@ function render(view) {
   }
 }
 
+// Tab functions
 function showLoginTab() {
-  document.getElementById('login-form').classList.remove('hidden');
-  document.getElementById('register-form').classList.add('hidden');
+  const loginForm = document.getElementById('login-form');
+  const registerForm = document.getElementById('register-form');
+  if (loginForm && registerForm) {
+    loginForm.classList.remove('hidden');
+    registerForm.classList.add('hidden');
+  }
 }
 function showRegisterTab() {
-  document.getElementById('login-form').classList.add('hidden');
-  document.getElementById('register-form').classList.remove('hidden');
+  const loginForm = document.getElementById('login-form');
+  const registerForm = document.getElementById('register-form');
+  if (loginForm && registerForm) {
+    loginForm.classList.add('hidden');
+    registerForm.classList.remove('hidden');
+  }
 }
 
+// Forgot Password Modal
+function showForgotPassword() {
+  const modalHtml = `
+    <div id="forgot-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+      <div class="bg-gray-900 rounded-3xl p-8 max-w-md w-full">
+        <h3 class="text-2xl font-bold mb-6 text-center">Reset Password</h3>
+        <input id="reset-username" placeholder="Enter your username" class="w-full p-4 bg-black rounded-2xl mb-4 text-white">
+        <input id="reset-new-password" type="password" placeholder="New password" class="w-full p-4 bg-black rounded-2xl mb-4 text-white">
+        <input id="reset-confirm-password" type="password" placeholder="Confirm new password" class="w-full p-4 bg-black rounded-2xl mb-6 text-white">
+        <div class="flex gap-3">
+          <button onclick="resetPassword()" class="flex-1 py-3 bg-navy rounded-2xl font-semibold">Reset Password</button>
+          <button onclick="closeForgotModal()" class="flex-1 py-3 bg-gray-700 rounded-2xl font-semibold">Cancel</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function closeForgotModal() {
+  const modal = document.getElementById('forgot-modal');
+  if (modal) modal.remove();
+}
+
+function resetPassword() {
+  const username = document.getElementById('reset-username').value.trim();
+  const newPass = document.getElementById('reset-new-password').value;
+  const confirmPass = document.getElementById('reset-confirm-password').value;
+
+  if (!username || !newPass || !confirmPass) {
+    alert("Please fill all fields.");
+    return;
+  }
+  if (newPass !== confirmPass) {
+    alert("Passwords do not match.");
+    return;
+  }
+  if (newPass.length < 4) {
+    alert("Password must be at least 4 characters.");
+    return;
+  }
+
+  const userIndex = users.findIndex(u => u.username === username);
+  if (userIndex === -1) {
+    alert("Username not found. Please check or register a new account.");
+    return;
+  }
+
+  users[userIndex].password = newPass;
+  saveUsers();
+  alert(" Password reset successful! Please login with your new password.");
+  closeForgotModal();
+}
+
+// Registration
 function handleRegister() {
   const username = document.getElementById('reg-username').value.trim();
   const password = document.getElementById('reg-password').value;
@@ -128,6 +195,7 @@ function handleRegister() {
   showLoginTab();
 }
 
+// Login 
 function handleLogin() {
   const username = document.getElementById('username').value.trim();
   const password = document.getElementById('password').value;
@@ -147,7 +215,7 @@ function logout() {
 
 function navigate(page) { render(page); }
 
-// AI Tutor
+// AI Tutor (Fixed Mock version that works without API key)
 async function sendAI() {
   const input = document.getElementById('prompt');
   const chat = document.getElementById('chat');
@@ -158,19 +226,26 @@ async function sendAI() {
   chat.scrollTop = chat.scrollHeight;
   input.value = "";
 
-  try {
-    const res = await fetch('/api/ai', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt })
-    });
-    const data = await res.json();
-    const formatted = data.reply.replace(/\n/g, '<br>');
-    chat.innerHTML += `<div class="mb-4"><span class="bg-gray-800 px-5 py-3 rounded-3xl leading-relaxed block whitespace-pre-wrap">${formatted}</span></div>`;
-    chat.scrollTop = chat.scrollHeight;
-  } catch (e) {
-    chat.innerHTML += `<div class="mb-4 text-red-400">AI temporarily unavailable.</div>`;
+  // Mock intelligent responses (works offline)
+  const lowerPrompt = prompt.toLowerCase();
+  let reply = "";
+  
+  if (lowerPrompt.includes("photosynthesis")) {
+    reply = "Photosynthesis is the process plants use to convert sunlight, water, and carbon dioxide into food (glucose) and oxygen. It happens in the leaves' chloroplasts.";
+  } else if (lowerPrompt.includes("math") || lowerPrompt.includes("algebra")) {
+    reply = "In mathematics, algebra uses letters to represent numbers. For example, solving 2x + 3 = 9 means x = 3. Would you like a practice problem?";
+  } else if (lowerPrompt.includes("history") || lowerPrompt.includes("kenya")) {
+    reply = "Kenya gained independence in 1963. The first president was Jomo Kenyatta. We study our history to understand our heritage and build a better future.";
+  } else if (lowerPrompt.includes("science")) {
+    reply = "Science is the study of the natural world through observation and experiment. What specific topic are you learning in CBC Science?";
+  } else {
+    reply = `That's a good question about "${prompt}". In the Kenyan CBC curriculum, we encourage critical thinking. Let me help: Can you tell me more about what you already know regarding this topic?`;
   }
+  
+  setTimeout(() => {
+    chat.innerHTML += `<div class="mb-4"><span class="bg-gray-800 px-5 py-3 rounded-3xl leading-relaxed block whitespace-pre-wrap">${reply}</span></div>`;
+    chat.scrollTop = chat.scrollHeight;
+  }, 300);
 }
 
 // Teacher/Admin Dashboard with Management
@@ -190,9 +265,7 @@ function teacherAdminDashboard() {
       <div class="mt-12">
         <div class="flex justify-between items-center mb-6">
           <h3 class="text-3xl font-bold">📚 Manage All Materials</h3>
-          <button onclick="loadTeacherMaterials()" class="px-4 py-2 bg-gray-700 rounded-xl hover:bg-gray-600 transition">
-             Refresh List
-          </button>
+          <button onclick="loadTeacherMaterials()" class="px-4 py-2 bg-gray-700 rounded-xl hover:bg-gray-600 transition"> Refresh List</button>
         </div>
         <div id="teacher-materials-list" class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div class="text-gray-400 text-center py-12 col-span-2">Loading materials...</div>
@@ -306,8 +379,6 @@ function showUploadForm() {
             <option value="Engineering">Engineering</option>
             <option value="Mathematics">Mathematics</option>
             <option value="Social Skills">Social Skills</option>
-            <option value="Languages">Languages</option>
-            <option value="Other">Other</option>
           </select>
         </div>
         <div class="mb-6">
@@ -386,7 +457,7 @@ async function uploadFileMaterial() {
   try {
     const res = await fetch('/api/materials/upload-file', { method: 'POST', body: formData });
     if (res.ok) {
-      alert("✅ Material uploaded successfully!");
+      alert(" Material uploaded successfully!");
       render('dashboard');
     } else {
       const error = await res.json();
@@ -621,7 +692,7 @@ async function loadProgress() {
   } catch(e) { container.innerHTML = `<p class="text-gray-400">Progress tracking coming soon.</p>`; }
 }
 
-// PWA
+// PWA Install
 let deferredPrompt;
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; showInstallButton(); });
 function showInstallButton() {
@@ -633,5 +704,5 @@ function showInstallButton() {
   document.body.appendChild(btn);
 }
 
-// Start
+// Start the app
 render('landing');
